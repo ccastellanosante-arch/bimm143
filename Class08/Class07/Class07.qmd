@@ -1,0 +1,225 @@
+---
+title: "Class07"
+author: "Crystal Ante"
+format: pdf
+toc: TRUE
+---
+# K-means Clustering
+
+```{r}
+set.seed(123)
+
+temp <- c(rnorm(30, mean = -3),
+          rnorm(30, mean = 3))
+
+x_demo <- cbind(x = temp, y = rev(temp))
+
+plot(x_demo)
+```
+> How many points are in each cluster, and where are the cluster centers?
+
+There are 30 points in each cluster. The first cluster is centered around (-3.05, 3.18), while the second is centered around (3.18, -3.05). The results also show which cluster each point belongs to.
+
+```{r}
+k <- kmeans(x_demo, centers = 2, nstart = 20)
+
+k$size
+k$centers
+k$cluster
+```
+
+```{r}
+plot(x_demo, col = k$cluster)
+points(k$centers, col = "blue", pch = 15, cex = 2)
+```
+
+# Hierarchical Clustering
+
+> How can we use hierarchical clustering to group our data?
+
+Hierarchical clustering groups points based on their distances from each other. We can use `hclust()` to create a dendrogram that shows how the points are grouped.
+
+```{r}
+hc <- hclust(dist(x_demo))
+
+plot(hc)
+```
+
+```{r}
+groups <- cutree(hc, k = 2)
+
+groups
+
+plot(x_demo, col = groups)
+```
+
+We can use `cutree()` to divide the dendrogram into two clusters. The results show which points belong to each group, and the plot helps us see how the points are separated.
+
+# 1. PCA of UK Food Data
+
+> **Q1.** How many rows and columns are in your data frame?
+
+The data frame has 17 rows and 5 columns. I used the `dim()` function to find this, but I could also use `nrow()` and `ncol()`.
+
+```{r}
+url <- "https://tinyurl.com/UK-foods"
+x <- read.csv(url)
+
+dim(x)
+```
+
+## Q2. Fixing the Row Names
+
+> **Q2.** Which approach to solving the row-names problem do you prefer and why? Is one approach more robust under certain circumstances?
+
+I prefer using `row.names=1` because it sets the row names when importing the data, so I don't have to fix them afterward. However, the first approach might be better if I need to check the data first.
+
+```{r}
+rownames(x) <- x[,1]
+x <- x[,-1]
+
+head(x)
+dim(x)
+```
+
+## Q3. Bar Plot
+
+> **Q3.** Changing what optional argument in the barplot() function results in a stacked bar plot?
+
+Changing `beside=TRUE` to `beside=FALSE` makes the bars stacked instead of side by side.
+
+```{r}
+barplot(as.matrix(x), beside=FALSE, col=rainbow(nrow(x)))
+```
+
+## Q4. Stacked Bar Plot with ggplot2
+
+> **Q4.** Changing what optional argument in the ggplot() code results in a stacked bar plot?
+
+Changing `position = "dodge"` to `position = "stack"` makes the bars stacked instead of side by side.
+
+```{r}
+library(tidyr)
+library(ggplot2)
+
+x_long <- x |>
+  tibble::rownames_to_column("Food") |>
+  pivot_longer(cols = -Food,
+               names_to = "Country",
+               values_to = "Consumption")
+
+ggplot(x_long) +
+  aes(x = Country, y = Consumption, fill = Food) +
+  geom_col(position = "stack") +
+  theme_bw()
+```
+
+## Q5. Pairs Plot
+
+> **Q5.** Can you make sense of the code and resulting figure? What does it mean if a point lies on the diagonal?
+
+The `pairs()` function compares food consumption between different countries. If a point lies on the diagonal, it means both countries have the same consumption amount for that food.
+
+```{r}
+pairs(x, col=rainbow(nrow(x)), pch=16)
+```
+
+## Q6. Heatmap
+
+> **Q6.** Based on the pairs and heatmap figures, which countries cluster together, and what does this suggest about their food consumption patterns? Can you easily tell the main differences between Northern Ireland and the other countries?
+
+England, Wales, and Scotland cluster together, which suggests they have similar food consumption patterns. Northern Ireland is more different, but it's hard to tell exactly which foods are causing these differences just from the plots.
+
+```{r}
+library(pheatmap)
+
+pheatmap(as.matrix(x))
+```
+
+## Q7. PCA Plot
+
+> **Q7.** Complete the code to generate a plot of PC1 vs. PC2 with country labels.
+
+```{r}
+# Perform PCA
+pca <- prcomp(t(x))
+summary(pca)
+
+# Create a data frame for plotting
+df <- as.data.frame(pca$x)
+df$Country <- rownames(df)
+
+# Plot PC1 vs PC2
+ggplot(df) +
+  aes(x = PC1, y = PC2, label = Country) +
+  geom_point(size = 3) +
+  geom_text(vjust = -0.5) +
+  xlim(-270, 500) +
+  xlab("PC1") +
+  ylab("PC2") +
+  theme_bw()
+```
+
+## Q8. Customizing the PCA Plot
+
+> **Q8.** Customize the plot so that the country names match the colors in the UK and Ireland map.
+
+```{r}
+# Assign colors to each country
+country_colors <- c(
+  "England" = "orange",
+  "Wales" = "purple",
+  "Scotland" = "steelblue",
+  "N.Ireland" = "forestgreen"
+)
+
+# Plot PCA with colored country labels
+ggplot(df) +
+  aes(x = PC1, y = PC2, label = Country) +
+  geom_point(size = 3) +
+  geom_text(aes(color = Country), vjust = -0.5) +
+  scale_color_manual(values = country_colors) +
+  xlim(-270, 500) +
+  xlab("PC1") +
+  ylab("PC2") +
+  theme_bw()
+```
+## Scree Plot
+
+```{r}
+v <- round(pca$sdev^2 / sum(pca$sdev^2) * 100)
+v
+variance_df <- data.frame(
+  PC = factor(paste0("PC", 1:length(v)),
+              levels = paste0("PC", 1:length(v))),
+  Variance = v
+)
+
+# Create scree plot
+ggplot(variance_df) +
+  aes(x = PC, y = Variance) +
+  geom_col(fill = "steelblue") +
+  xlab("Principal Component") +
+  ylab("Percent Variation") +
+  theme_bw()
+```
+
+The scree plot shows that PC1 explains about 67% of the variation and PC2 explains about 29%. Together, they explain around 96% of the variation in food consumption.
+
+## Q9. PC2 Loading Scores
+
+> **Q9.** Generate a similar loadings plot for PC2. What two food groups feature prominently, and what does PC2 mainly tell us about?
+
+PC2 mainly shows the differences in soft drink and fresh potato consumption between the countries. Soft drinks have the highest positive loading, while fresh potatoes have the strongest negative loading.
+
+```{r}
+ggplot(pca$rotation) +
+  aes(x = PC2,
+      y = reorder(rownames(pca$rotation), PC2)) +
+  geom_col(fill = "steelblue") +
+  xlab("PC2 Loading Score") +
+  ylab("") +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 9))
+```
+
